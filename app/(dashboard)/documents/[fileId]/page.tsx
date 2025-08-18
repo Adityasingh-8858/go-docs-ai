@@ -13,7 +13,11 @@ interface PageProps {
 export default async function DocumentChatPage({ params }: PageProps) {
     const { fileId } = params;
     const { userId } = auth();
-    if (!userId) return notFound();
+    if (!userId) {
+        // This should not happen if middleware is configured correctly,
+        // but it's a good practice for type safety.
+        return notFound();
+    }
 
     const supabase = getSupabaseAdmin();
     const { data: document, error } = await supabase

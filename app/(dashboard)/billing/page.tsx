@@ -6,6 +6,12 @@ import { getSupabaseAdmin } from "@/lib/supabase";
 
 export default async function BillingPage() {
     const { userId } = auth();
+    if (!userId) {
+        // This should not happen if middleware is configured correctly,
+        // but it's a good practice for type safety.
+        return new Response("Unauthorized", { status: 401 });
+    }
+
     const userSubscription = await getUserSubscription();
 
     let stripeCustomerId: string | null = null;

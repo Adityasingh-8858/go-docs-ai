@@ -7,6 +7,10 @@ import Link from "next/link";
 
 export default async function DashboardPage() {
     const user = await currentUser();
+    if (!user) {
+        // This should not happen if middleware is configured correctly
+        return new Response("Unauthorized", { status: 401 });
+    }
     const { hasReachedLimit, currentCount, limit } = await checkUploadLimits();
 
     return (

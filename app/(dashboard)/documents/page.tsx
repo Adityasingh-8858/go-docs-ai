@@ -7,7 +7,11 @@ import { FileText, MessageSquare, Clock, Loader2, AlertTriangle } from "lucide-r
 
 export default async function DocumentsPage() {
     const { userId } = auth();
-    if (!userId) return null; // Should be handled by layout protection
+    if (!userId) {
+        // This should not happen if middleware is configured correctly,
+        // but it's a good practice for type safety.
+        return new Response("Unauthorized", { status: 401 });
+    }
 
     const supabase = getSupabaseAdmin();
     const { data: documents, error } = await supabase
