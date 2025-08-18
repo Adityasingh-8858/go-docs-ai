@@ -6,7 +6,8 @@ import Link from "next/link";
 import { FileText, MessageSquare, Clock, Loader2, AlertTriangle } from "lucide-react";
 
 export default async function DocumentsPage() {
-    const { userId } = auth();
+    const session = auth();
+    const userId = session.userId;
     if (!userId) {
         // This should not happen if middleware is configured correctly,
         // but it's a good practice for type safety.

@@ -5,7 +5,8 @@ import { auth } from "@clerk/nextjs/server";
 import { getSupabaseAdmin } from "@/lib/supabase";
 
 export default async function BillingPage() {
-    const { userId } = auth();
+    const session = auth();
+    const userId = session.userId;
     if (!userId) {
         // This should not happen if middleware is configured correctly,
         // but it's a good practice for type safety.
