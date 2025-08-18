@@ -1,0 +1,68 @@
+name: IntelliDocs AI CI/CD
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build-and-test:
+    name: Build and Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Run linter
+        run: npm run lint
+
+      - name: Run build
+        run: npm run build
+        # Environment variables needed for the build command can be added here
+        # env:
+        #   SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+        #   NEXT_PUBLIC_...: ${{ secrets.NEXT_PUBLIC_... }}
+
+  deploy-to-heroku:
+    name: Deploy to Heroku
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' # Only run on push to main
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Deploy to Heroku
+        uses: akhileshns/heroku-deploy@v3.12.12 # Example action
+        with:
+          heroku_api_key: ${{ secrets.HEROKU_API_KEY }}
+          heroku_app_name: ${{ secrets.HEROKU_APP_NAME }} # e.g., "intellidocs-ai"
+          heroku_email: ${{ secrets.HEROKU_EMAIL }}
+        # Note: Heroku deployment will use the Procfile
+
+  deploy-to-digitalocean:
+    name: Deploy to DigitalOcean
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' # Only run on push to main
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: DigitalOcean App Platform deployment
+        uses: digitalocean/app_action@v1.2.0 # Example action
+        with:
+          app_name: ${{ secrets.DO_APP_NAME }}
+          token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+        # Note: DigitalOcean deployment will use the Dockerfile
