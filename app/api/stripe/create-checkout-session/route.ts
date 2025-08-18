@@ -4,9 +4,6 @@ import { stripe } from "@/lib/stripe";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { getUserSubscription } from "@/lib/subscriptions";
 
-import { getSupabaseAdmin } from "@/lib/supabase";
-import { getUserSubscription } from "@/lib/subscriptions";
-
 export async function POST(req: NextRequest) {
     const { userId } = auth();
     const { priceId } = await req.json();
