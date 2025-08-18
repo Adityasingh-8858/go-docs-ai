@@ -3,11 +3,11 @@ import { pineconeIndex } from "./pinecone";
 import { RecursiveCharacterTextSplitter } from "langchain/text_splitter";
 import { GoogleGenerativeAIEmbeddings } from "@langchain/google-genai";
 import pdf from "pdf-parse";
-import { getUserSubscription } from "./subscriptions";
+import { getSubscriptionForUser } from "./subscriptions";
 
 const embeddings = new GoogleGenerativeAIEmbeddings({
     apiKey: process.env.GEMINI_API_KEY!,
-    model: "embedding-001", // A common model for embeddings
+    model: "embedding-001",
 });
 
 async function getPdfText(fileBuffer: Buffer) {
@@ -37,34 +37,34 @@ export async function processPDF(fileKey: string, documentId: string) {
         const { text, numPages } = await getPdfText(fileBuffer);
 
         // 3. Check page count against user's subscription plan
-        const { data: doc } = await supabase.from('documents').select('user_id').eq('id', documentId).single();
-        if (!doc) throw new Error("Document not found");
+        const { data: doc, error: docError } = await supabase.from('documents').select('user_id').eq('id', documentId).single();
+        if (docError || !doc) {
+            throw new Error(`Document not found for id: ${documentId}`, { cause: docError });
+        }
 
-        // We need a way to check subscription for a specific user, let's adapt getUserSubscription
-        // For now, let's assume we can get it. This highlights a need for a more specific function.
-        // A better approach would be: `getSubscriptionForUser(userId)`.
-        // For now, this part of the logic is simplified. Let's assume an admin can check any user.
-        // The current `getUserSubscription` uses `auth()`, which won't work in a background job.
-        // This is a known limitation of this simplified architecture.
-        // A real-world solution would pass the userId or have a dedicated way to check plans.
+        const subscription = await getSubscriptionForUser(doc.user_id);
+        if (numPages > subscription.quota.PAGES_PER_PDF) {
+            await supabase.from("documents").update({ upload_status: 'FAILED' }).eq('id', documentId);
+            throw new Error(`Page limit of ${subscription.quota.PAGES_PER_PDF} exceeded. PDF has ${numPages} pages.`);
+        }
 
-        // Let's just update page count for now. A full implementation would have the check.
+        // 4. Update page count in the database
         await supabase
             .from("documents")
             .update({ page_count: numPages })
             .eq("id", documentId);
 
-        // 4. Split text into chunks
+        // 5. Split text into chunks
         const textSplitter = new RecursiveCharacterTextSplitter({
             chunkSize: 1000,
             chunkOverlap: 200,
         });
         const chunks = await textSplitter.splitText(text);
 
-        // 5. Create embeddings for each chunk
+        // 6. Create embeddings for each chunk
         const vectors = await embeddings.embedDocuments(chunks);
 
-        // 6. Upsert vectors into Pinecone
+        // 7. Upsert vectors into Pinecone using a namespace for the document
         const vectorsToUpsert = vectors.map((vector, i) => ({
             id: `${documentId}_chunk_${i}`,
             values: vector,
@@ -74,14 +74,14 @@ export async function processPDF(fileKey: string, documentId: string) {
             },
         }));
 
-        // Pinecone recommends upserting in batches
-        const batchSize = 100;
+        const index = pineconeIndex.namespace(documentId);
+        const batchSize = 100; // Pinecone recommends upserting in batches
         for (let i = 0; i < vectorsToUpsert.length; i += batchSize) {
             const batch = vectorsToUpsert.slice(i, i + batchSize);
-            await pineconeIndex.upsert(batch);
+            await index.upsert(batch);
         }
 
-        // 7. Update document status to SUCCESS
+        // 8. Update document status to SUCCESS
         await supabase
             .from("documents")
             .update({ upload_status: "SUCCESS" })
@@ -92,7 +92,6 @@ export async function processPDF(fileKey: string, documentId: string) {
     } catch (error) {
         console.error(`[PROCESS_PDF_ERROR] for document ${documentId}:`, error);
 
-        // Update document status to FAILED
         await supabase
             .from("documents")
             .update({ upload_status: "FAILED" })

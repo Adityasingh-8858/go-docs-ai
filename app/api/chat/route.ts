@@ -55,14 +55,17 @@ export async function POST(req: NextRequest) {
         // 1. Get vector embeddings for the user's question
         const questionEmbedding = await embeddings.embedQuery(question);
 
-        // 2. Query Pinecone for relevant context
-        const queryResult = await pineconeIndex.query({
+        // 2. Query Pinecone for relevant context from the correct namespace
+        const index = pineconeIndex.namespace(fileId);
+        const queryResult = await index.query({
             vector: questionEmbedding,
             topK: 5,
-            filter: { documentId: { $eq: fileId } }
         });
 
-        const context = queryResult.matches.map(match => match.metadata?.text).join("\n\n");
+        const context = queryResult.matches
+            .map(match => match.metadata && (match.metadata as {text: string}).text)
+            .filter(Boolean)
+            .join("\n\n");
 
         // 3. Create the chain
         const chain = RunnableSequence.from([

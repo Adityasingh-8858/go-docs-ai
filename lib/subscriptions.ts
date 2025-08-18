@@ -79,13 +79,47 @@ export async function getUserSubscription() {
     };
 }
 
-export async function checkUploadLimits() {
-    const subscription = await getUserSubscription();
-    const { userId } = auth();
+// This new function can be called from server-side processes without a live user session
+export async function getSubscriptionForUser(userId: string) {
+    const supabase = getSupabaseAdmin();
+    const { data: user, error } = await supabase
+        .from('users')
+        .select('stripe_price_id, stripe_current_period_end')
+        .eq('id', userId)
+        .single();
 
+    if (error || !user) {
+        return { ...plans[0], isSubscribed: false }; // Default to Basic plan on error
+    }
+
+    const isSubscribed = Boolean(
+        user.stripe_price_id &&
+        user.stripe_current_period_end &&
+        new Date(user.stripe_current_period_end).getTime() + 86_400_000 > Date.now()
+    );
+
+    const plan = isSubscribed
+        ? plans.find((p) => p.priceId === user.stripe_price_id)
+        : plans[0];
+
+    if (!plan) {
+        return { ...plans[0], isSubscribed: false }; // Fallback to basic
+    }
+
+    return {
+        ...plan,
+        isSubscribed,
+    };
+}
+
+
+export async function checkUploadLimits() {
+    const { userId } = auth();
     if (!userId) {
         return { hasReachedLimit: true, currentCount: 0, limit: 0 };
     }
+
+    const subscription = await getUserSubscription();
 
     const supabase = getSupabaseAdmin();
     const { count, error } = await supabase
