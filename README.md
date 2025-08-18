@@ -140,6 +140,19 @@ DigitalOcean deployment uses the `Dockerfile` to build and run the application.
 
 ---
 
+## ⚠️ Production Considerations
+
+### Asynchronous PDF Processing
+
+The current implementation triggers the PDF processing asynchronously from the `/api/upload` endpoint. While this works for development and small-scale use, it has limitations in a production serverless environment (like Vercel or Heroku).
+
+-   **Problem**: Serverless functions have a maximum execution timeout (e.g., 10-60 seconds). Processing a very large or complex PDF could exceed this limit, causing the process to fail silently.
+-   **Solution**: For a robust, scalable production application, you should use a dedicated **message queue** and a **background worker**.
+    1.  **Queue**: Instead of calling `processPDF()` directly, the upload API should push a job message (containing the `fileKey` and `documentId`) to a queue service like [Supabase PGQ](https://supabase.com/docs/guides/database/extensions/pgq), RabbitMQ, or AWS SQS.
+    2.  **Worker**: You would have a separate, long-running worker process (e.g., a separate Node.js service running on a Heroku worker dyno or a container) that listens to the queue. When a new job appears, the worker picks it up and executes the `processPDF` function. This architecture decouples the long-running task from the short-lived API request, ensuring reliability.
+
+---
+
 ## 📂 Project Structure
 
 ```

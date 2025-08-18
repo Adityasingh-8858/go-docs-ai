@@ -79,20 +79,29 @@ export async function POST(req: NextRequest) {
       .update({ file_key: fileKey, upload_status: "PROCESSING" })
       .eq("id", docRecord.id);
 
-    // 6. Asynchronously process the PDF
-    // In a production environment, this should be handled by a message queue (e.g., RabbitMQ, SQS)
-    // and a separate worker service to prevent serverless function timeouts and ensure reliability.
-    // For this project, we'll call it directly but won't wait for it to complete.
+    // 6. Asynchronously process the PDF.
+    // IMPORTANT: In a production environment, this is not a robust solution.
+    // Serverless functions (like on Vercel or Heroku) have execution time limits.
+    // A very large PDF could cause this function to time out before processing is complete.
+    // A more robust architecture would use a dedicated queue service (e.g., Supabase PGQ, RabbitMQ, AWS SQS)
+    // to enqueue a job, and a separate, long-running worker service to process the queue.
+    // This ensures reliability and scalability.
     processPDF(fileKey, docRecord.id).catch((e) => {
-        console.error(`[FATAL] PDF processing failed for document ${docRecord.id}:`, e);
-        // Error handling should be robust here, maybe update the status to FAILED
+        console.error(`[FATAL] PDF processing failed for document ${docRecord.id}:`, {
+            message: (e as Error).message,
+            stack: (e as Error).stack,
+        });
+        // In a real app, you might want to notify the user or have a retry mechanism.
     });
 
     // 7. Return the document record to the client
     return NextResponse.json(docRecord, { status: 201 });
 
   } catch (error) {
-    console.error("[UPLOAD_API_ERROR]", error);
+    console.error("[UPLOAD_API_ERROR]", {
+        message: (error as Error).message,
+        stack: (error as Error).stack,
+    });
     return new NextResponse("Internal Server Error", { status: 500 });
   }
 }

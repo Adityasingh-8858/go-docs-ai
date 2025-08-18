@@ -90,7 +90,11 @@ export async function processPDF(fileKey: string, documentId: string) {
         console.log(`[SUCCESS] Processing complete for document ${documentId}`);
 
     } catch (error) {
-        console.error(`[PROCESS_PDF_ERROR] for document ${documentId}:`, error);
+        console.error(`[PROCESS_PDF_ERROR] for document ${documentId}:`, {
+            message: (error as Error).message,
+            stack: (error as Error).stack,
+            cause: (error as Error).cause,
+        });
 
         await supabase
             .from("documents")
