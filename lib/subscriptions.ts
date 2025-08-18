@@ -33,8 +33,7 @@ export const plans = [
 ];
 
 export async function getUserSubscription() {
-    const session = auth();
-    const userId = session.userId;
+    const { userId } = auth();
     if (!userId) {
         return { ...plans[0], isSubscribed: false, isCanceled: false }; // Default to Basic plan if no user
     }
@@ -115,8 +114,7 @@ export async function getSubscriptionForUser(userId: string) {
 
 
 export async function checkUploadLimits() {
-    const session = auth();
-    const userId = session.userId;
+    const { userId } = auth();
     if (!userId) {
         return { hasReachedLimit: true, currentCount: 0, limit: 0 };
     }

@@ -5,14 +5,12 @@ import { auth } from "@clerk/nextjs/server";
 import { getSupabaseAdmin } from "@/lib/supabase";
 
 export default async function BillingPage() {
-    const session = auth();
-    const userId = session.userId;
+    const { userId } = auth();
+    // The middleware will protect this page, so userId should always be present.
+    // A check is still good practice for non-TS environments, but the type should be correct now.
     if (!userId) {
-        // This should not happen if middleware is configured correctly,
-        // but it's a good practice for type safety.
         return new Response("Unauthorized", { status: 401 });
     }
-
     const userSubscription = await getUserSubscription();
 
     let stripeCustomerId: string | null = null;

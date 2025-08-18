@@ -6,11 +6,8 @@ import Link from "next/link";
 import { FileText, MessageSquare, Clock, Loader2, AlertTriangle } from "lucide-react";
 
 export default async function DocumentsPage() {
-    const session = auth();
-    const userId = session.userId;
+    const { userId } = auth();
     if (!userId) {
-        // This should not happen if middleware is configured correctly,
-        // but it's a good practice for type safety.
         return new Response("Unauthorized", { status: 401 });
     }
 

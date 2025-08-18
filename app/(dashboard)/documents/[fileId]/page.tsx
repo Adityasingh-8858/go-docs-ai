@@ -12,11 +12,8 @@ interface PageProps {
 
 export default async function DocumentChatPage({ params }: PageProps) {
     const { fileId } = params;
-    const session = auth();
-    const userId = session.userId;
+    const { userId } = auth();
     if (!userId) {
-        // This should not happen if middleware is configured correctly,
-        // but it's a good practice for type safety.
         return notFound();
     }
 
