@@ -1,5 +1,6 @@
 import ChatInterface from "@/components/chat/ChatInterface";
 import SummarizeButton from "@/components/chat/SummarizeButton";
+import ErrorBoundary from "@/components/sentry/ErrorBoundary";
 import { auth } from "@clerk/nextjs/server";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { notFound } from "next/navigation";
@@ -45,7 +46,9 @@ export default async function DocumentChatPage({ params }: PageProps) {
 
             {/* The ChatInterface component will fill the remaining height */}
             <div className="flex-1">
-                <ChatInterface fileId={document.id} />
+                <ErrorBoundary componentName="ChatInterface">
+                    <ChatInterface fileId={document.id} />
+                </ErrorBoundary>
             </div>
         </div>
     );

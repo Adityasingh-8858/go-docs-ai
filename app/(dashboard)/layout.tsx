@@ -1,10 +1,12 @@
 import Sidebar from "@/components/dashboard/Sidebar";
+import SentryUserTracker from "@/components/dashboard/SentryUserTracker";
 import UserNav from "@/components/dashboard/UserNav";
 import { ReactNode } from "react";
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
   return (
     <div className="flex min-h-screen">
+      <SentryUserTracker />
       {/* I will create the Sidebar component later */}
       <Sidebar />
 

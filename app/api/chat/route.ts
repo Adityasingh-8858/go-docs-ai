@@ -7,6 +7,8 @@ import { ChatGroq } from "@langchain/groq";
 import { PromptTemplate } from "@langchain/core/prompts";
 import { StringOutputParser } from "@langchain/core/output_parsers";
 import { RunnableSequence } from "@langchain/core/runnables";
+import { trace } from "@/lib/sentry";
+import * as Sentry from "@sentry/nextjs";
 
 const embeddings = new GoogleGenerativeAIEmbeddings({
     apiKey: process.env.GEMINI_API_KEY!,
@@ -21,7 +23,7 @@ const model = new ChatGroq({
 const promptTemplate = PromptTemplate.fromTemplate(`
 You are a helpful AI assistant for the IntelliDocs AI platform. Your name is DocuBot.
 Answer the user's question based ONLY on the following context.
-If the context doesn't contain the answer, state that you couldn't find the information in the document.
+If the context doesn't contain the answer, state that you couldn't find the information in the.
 Do not make up information. Be concise and professional.
 
 Context:
@@ -34,60 +36,68 @@ Answer:
 `);
 
 export async function POST(req: NextRequest) {
-    try {
-        const { userId } = auth();
-        if (!userId) {
-            return new NextResponse("Unauthorized", { status: 401 });
+    return trace('api.chat.post', async (span) => {
+        try {
+            const { userId } = auth();
+            if (!userId) {
+                return new NextResponse("Unauthorized", { status: 401 });
+            }
+            span?.setAttribute('userId', userId);
+
+            const body = await req.json();
+            const { messages, fileId } = body as { messages: Message[]; fileId: string };
+            span?.setAttribute('fileId', fileId);
+
+            if (!fileId) {
+                return new NextResponse("File ID is required", { status: 400 });
+            }
+
+            const lastUserMessage = messages[messages.length - 1];
+            const question = lastUserMessage.content;
+
+            // 1. Get vector embeddings for the user's question
+            const questionEmbedding = await trace('gemini.embedQuery', () =>
+                embeddings.embedQuery(question)
+            );
+
+            // 2. Query Pinecone for relevant context
+            const context = await trace('pinecone.query', async () => {
+                const index = pineconeIndex.namespace(fileId);
+                const queryResult = await index.query({
+                    vector: questionEmbedding,
+                    topK: 5,
+                });
+                return queryResult.matches
+                    .map(match => match.metadata && (match.metadata as { text: string }).text)
+                    .filter(Boolean)
+                    .join("\n\n");
+            });
+
+            // 3. Create the LangChain chain
+            const chain = RunnableSequence.from([
+                {
+                    context: () => Promise.resolve(context),
+                    question: (input: { question: string }) => input.question,
+                },
+                promptTemplate,
+                model,
+                new StringOutputParser(),
+            ]);
+
+            // 4. Stream the response
+            const stream = await trace('groq.stream', () =>
+                chain.stream({ question })
+            );
+
+            return new StreamingTextResponse(stream);
+
+        } catch (error) {
+            Sentry.captureException(error);
+            console.error("[CHAT_API_ERROR]", {
+                message: (error as Error).message,
+                stack: (error as Error).stack,
+            });
+            return new NextResponse("Internal Server Error", { status: 500 });
         }
-
-        const body = await req.json();
-        const { messages, fileId } = body as { messages: Message[]; fileId: string };
-
-        if (!fileId) {
-            return new NextResponse("File ID is required", { status: 400 });
-        }
-
-        const lastUserMessage = messages[messages.length - 1];
-        const question = lastUserMessage.content;
-
-        // 1. Get vector embeddings for the user's question
-        const questionEmbedding = await embeddings.embedQuery(question);
-
-        // 2. Query Pinecone for relevant context from the correct namespace
-        const index = pineconeIndex.namespace(fileId);
-        const queryResult = await index.query({
-            vector: questionEmbedding,
-            topK: 5,
-        });
-
-        const context = queryResult.matches
-            .map(match => match.metadata && (match.metadata as {text: string}).text)
-            .filter(Boolean)
-            .join("\n\n");
-
-        // 3. Create the chain
-        const chain = RunnableSequence.from([
-            {
-                context: () => Promise.resolve(context),
-                question: (input: { question: string }) => input.question,
-            },
-            promptTemplate,
-            model,
-            new StringOutputParser(),
-        ]);
-
-        // 4. Stream the response
-        const stream = await chain.stream({
-            question: question,
-        });
-
-        return new StreamingTextResponse(stream);
-
-    } catch (error) {
-    console.error("[CHAT_API_ERROR]", {
-        message: (error as Error).message,
-        stack: (error as Error).stack,
     });
-        return new NextResponse("Internal Server Error", { status: 500 });
-    }
 }
