@@ -1,3 +1,4 @@
+// FIXME: Investigate and fix authorization error during PDF processing.
 import { getSupabaseAdmin } from "./supabase";
 import { pineconeIndex } from "./pinecone";
 import { RecursiveCharacterTextSplitter } from "langchain/text_splitter";
