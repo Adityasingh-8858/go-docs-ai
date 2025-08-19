@@ -86,12 +86,20 @@ export async function POST(req: NextRequest) {
     // A more robust architecture would use a dedicated queue service (e.g., Supabase PGQ, RabbitMQ, AWS SQS)
     // to enqueue a job, and a separate, long-running worker service to process the queue.
     // This ensures reliability and scalability.
-    processPDF(fileKey, docRecord.id).catch((e) => {
+    // Start the processing, but don't wait for it.
+    // The .catch() block is crucial for updating the status on failure.
+    processPDF(fileKey, docRecord.id).catch(async (e) => {
         console.error(`[FATAL] PDF processing failed for document ${docRecord.id}:`, {
             message: (e as Error).message,
             stack: (e as Error).stack,
         });
-        // In a real app, you might want to notify the user or have a retry mechanism.
+
+        // Update the document status to FAILED in the database
+        const supabaseAdmin = getSupabaseAdmin();
+        await supabaseAdmin
+            .from("documents")
+            .update({ upload_status: "FAILED" })
+            .eq("id", docRecord.id);
     });
 
     // 7. Return the document record to the client

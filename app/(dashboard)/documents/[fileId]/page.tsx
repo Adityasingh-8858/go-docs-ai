@@ -1,4 +1,5 @@
 import ChatInterface from "@/components/chat/ChatInterface";
+import SummarizeButton from "@/components/chat/SummarizeButton";
 import { auth } from "@clerk/nextjs/server";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { notFound } from "next/navigation";
@@ -31,12 +32,15 @@ export default async function DocumentChatPage({ params }: PageProps) {
 
     return (
         <div className="flex flex-col h-[calc(100vh-8rem)]">
-            <div className="mb-4">
-                <h1 className="text-3xl font-bold flex items-center">
-                    <FileText className="mr-3 text-purple-400" />
-                    Chat with <span className="truncate ml-2">{document.file_name}</span>
-                </h1>
-                <p className="text-gray-400">Ask questions and get answers directly from your document.</p>
+            <div className="mb-4 flex justify-between items-start">
+                <div>
+                    <h1 className="text-3xl font-bold flex items-center">
+                        <FileText className="mr-3 text-purple-400 flex-shrink-0" />
+                        <span className="truncate">{document.file_name}</span>
+                    </h1>
+                    <p className="text-gray-400 mt-2">Ask questions and get answers directly from your document.</p>
+                </div>
+                <SummarizeButton fileId={document.id} />
             </div>
 
             {/* The ChatInterface component will fill the remaining height */}
